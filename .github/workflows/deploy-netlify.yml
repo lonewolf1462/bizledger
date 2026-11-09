@@ -68,7 +68,10 @@ jobs:
                       sys.exit(f'Netlify API denied site access (HTTP {e.code}); check token validity and site-management scope')
                   if e.code == 422:
                       try:
-                          detail = json.loads(detail).get('message', 'Netlify rejected the requested site name or account operation')
+                          payload = json.loads(detail)
+                          detail = payload.get('message') or payload.get('error') or payload.get('errors') or 'Netlify rejected the requested site name or account operation'
+                          if isinstance(detail, (dict, list)):
+                              detail = json.dumps(detail)
                       except Exception:
                           detail = 'Netlify rejected the requested site name or account operation'
                       sys.exit(f'Netlify refused BizLedger site creation (HTTP 422): {detail}')
