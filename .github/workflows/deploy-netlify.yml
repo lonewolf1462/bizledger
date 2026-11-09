@@ -84,9 +84,10 @@ jobs:
               sites.extend(batch)
               if len(batch) < 100:
                   break
-          matches = [s for s in sites if str(s.get('name', '')).casefold() == 'bizledger']
+          netlify_name = 'bizledger-lonewolf1462'
+          matches = [s for s in sites if str(s.get('name', '')).casefold() == netlify_name]
           if len(matches) > 1:
-              sys.exit('More than one exact BizLedger site was returned; refusing ambiguous deployment')
+              sys.exit('More than one matching BizLedger Netlify site was returned; refusing ambiguous deployment')
           if matches:
               site = matches[0]
               repo = (site.get('build_settings') or {}).get('repo_url') or site.get('repo_url')
@@ -94,10 +95,11 @@ jobs:
                   sys.exit('The exact-name Netlify site is linked to a different repository; refusing to alter it')
               print('Using the existing exact-name BizLedger site')
           else:
-              site = request('POST', f'{base}/sites', {'name': 'bizledger'})
-              if str(site.get('name', '')).casefold() != 'bizledger' or not site.get('id'):
-                  sys.exit('Netlify did not create the requested BizLedger site; refusing to deploy')
-              print('Created a distinct Netlify site named BizLedger')
+              netlify_name = 'bizledger-lonewolf1462'
+              site = request('POST', f'{base}/sites', {'name': netlify_name})
+              if str(site.get('name', '')).casefold() != netlify_name or not site.get('id'):
+                  sys.exit('Netlify did not create the requested distinct BizLedger site; refusing to deploy')
+              print(f'Created a distinct Netlify site named {site["name"]}')
           if not site.get('id') or not site.get('url'):
               sys.exit('Netlify site response lacked a site ID or URL; refusing to deploy')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
