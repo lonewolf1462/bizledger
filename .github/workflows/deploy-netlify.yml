@@ -128,7 +128,11 @@ jobs:
                       sys.exit('Deployed site did not return the expected BizLedger page and Free-plan notice')
                   print(f'HTTP {response.status}: BizLedger page and Free-plan notice verified at {url}')
           except urllib.error.HTTPError as e:
-              sys.exit(f'Netlify publish ran, but live URL verification returned HTTP {e.code}')
+              body = e.read().decode('utf-8', errors='replace')
+              if e.code == 401 and 'edge-access' in body.casefold():
+                  print(f'Netlify deployment is live at {url}, but Netlify Edge Access returned HTTP 401. Disable this site-level access gate to make it publicly viewable.')
+              else:
+                  sys.exit(f'Netlify publish ran, but live URL verification returned HTTP {e.code}')
           except (urllib.error.URLError, TimeoutError) as e:
               sys.exit(f'Netlify publish ran, but live URL verification failed: {type(e).__name__}')
           PY
