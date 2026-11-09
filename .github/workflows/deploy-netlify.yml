@@ -35,6 +35,8 @@ jobs:
           for asset in ('icon.svg', 'manifest.webmanifest', 'service-worker.js', 'subscription.css', 'subscription.js'):
               assert Path(asset).is_file(), f'missing {asset}'
           assert 'AdSense link coming soon' in html, 'Free-plan notice missing'
+          adsense = '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8662010271610342" crossorigin="anonymous"></script>'
+          assert adsense in html, 'Exact AdSense verification script missing'
           assert manifest.get('name', '').startswith('BizLedger'), 'unexpected PWA manifest name'
           js = Path('subscription.js').read_text()
           assert 'Billing integration not configured' in js, 'demo billing notice missing'
@@ -84,27 +86,24 @@ jobs:
               sites.extend(batch)
               if len(batch) < 100:
                   break
-          netlify_name = 'bizledger-lonewolf1462'
+          netlify_name = 'bizledger-1'
           matches = [s for s in sites if str(s.get('name', '')).casefold() == netlify_name]
           if len(matches) > 1:
-              sys.exit('More than one matching BizLedger Netlify site was returned; refusing ambiguous deployment')
-          if matches:
-              site = matches[0]
-              repo = (site.get('build_settings') or {}).get('repo_url') or site.get('repo_url')
-              if repo and repo.rstrip('/').casefold() not in ('https://github.com/lonewolf1462/bizledger', 'https://github.com/lonewolf1462/bizledger.git'):
-                  sys.exit('The exact-name Netlify site is linked to a different repository; refusing to alter it')
-              print('Using the existing exact-name BizLedger site')
-          else:
-              netlify_name = 'bizledger-lonewolf1462'
-              site = request('POST', f'{base}/sites', {'name': netlify_name})
-              if str(site.get('name', '')).casefold() != netlify_name or not site.get('id'):
-                  sys.exit('Netlify did not create the requested distinct BizLedger site; refusing to deploy')
-              print(f'Created a distinct Netlify site named {site["name"]}')
+              sys.exit('Multiple exact-name Netlify sites found for bizledger-1; refusing ambiguous deployment')
+          if not matches:
+              sys.exit('No existing Netlify site named bizledger-1 is visible to NETLIFY_AUTH_TOKEN. Add the site ID as a GitHub repository variable NETLIFY_SITE_ID and ensure the token has access to that site, then rerun. No site was created.')
+          site = matches[0]
+          repo = (site.get('build_settings') or {}).get('repo_url') or site.get('repo_url')
+          if repo and repo.rstrip('/').casefold() not in ('https://github.com/lonewolf1462/bizledger', 'https://github.com/lonewolf1462/bizledger.git'):
+              sys.exit('The bizledger-1 Netlify site is linked to a different repository; refusing to alter it')
+          if not site.get('id'):
+              sys.exit('The bizledger-1 Netlify site response lacked a site ID; refusing to deploy')
+          print('Using the existing exact-name BizLedger site bizledger-1')
           if not site.get('id') or not site.get('url'):
               sys.exit('Netlify site response lacked a site ID or URL; refusing to deploy')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f"site_id={site['id']}\n")
-              f.write(f"site_url=https://{site['name']}.netlify.app\n")
+              f.write('site_url=https://bizledger-1.netlify.app\n')
           print(f"Verified Netlify site name: {site['name']}")
           print(f"Netlify site URL: {site['url']}")
           PY
@@ -124,13 +123,14 @@ jobs:
           try:
               with urllib.request.urlopen(url, timeout=30) as response:
                   body = response.read().decode('utf-8', errors='replace')
-                  if response.status != 200 or 'AdSense link coming soon' not in body:
-                      sys.exit('Deployed site did not return the expected BizLedger page and Free-plan notice')
-                  print(f'HTTP {response.status}: BizLedger page and Free-plan notice verified at {url}')
+                  expected = '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8662010271610342" crossorigin="anonymous"></script>'
+                  if response.status != 200 or 'AdSense link coming soon' not in body or expected not in body:
+                      sys.exit('Deployed site did not return the exact AdSense script and Free-plan notice')
+                  print(f'HTTP {response.status}: exact AdSense script and Free-plan notice verified at {url}')
           except urllib.error.HTTPError as e:
               body = e.read().decode('utf-8', errors='replace')
               if e.code == 401 and 'edge-access' in body.casefold():
-                  print(f'Netlify deployment is live at {url}, but Netlify Edge Access returned HTTP 401. Disable this site-level access gate to make it publicly viewable.')
+                  sys.exit(f'Netlify deployed to {url}, but Edge Access returned HTTP 401, so public HTML source cannot be verified. No access setting was changed.')
               else:
                   sys.exit(f'Netlify publish ran, but live URL verification returned HTTP {e.code}')
           except (urllib.error.URLError, TimeoutError) as e:
