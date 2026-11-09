@@ -104,7 +104,7 @@ jobs:
               sys.exit('Netlify site response lacked a site ID or URL; refusing to deploy')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f"site_id={site['id']}\n")
-              f.write(f"site_url={site['url']}\n")
+              f.write(f"site_url=https://{site['name']}.netlify.app\n")
           print(f"Verified Netlify site name: {site['name']}")
           print(f"Netlify site URL: {site['url']}")
           PY
@@ -127,6 +127,8 @@ jobs:
                   if response.status != 200 or 'AdSense link coming soon' not in body:
                       sys.exit('Deployed site did not return the expected BizLedger page and Free-plan notice')
                   print(f'HTTP {response.status}: BizLedger page and Free-plan notice verified at {url}')
+          except urllib.error.HTTPError as e:
+              sys.exit(f'Netlify publish ran, but live URL verification returned HTTP {e.code}')
           except (urllib.error.URLError, TimeoutError) as e:
               sys.exit(f'Netlify publish ran, but live URL verification failed: {type(e).__name__}')
           PY
