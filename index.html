@@ -19,11 +19,13 @@ form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{
 @media(max-width:780px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}main{margin-top:12px}.metric{font-size:1.25rem}}
 @media(max-width:420px){.cards{gap:8px}.card{padding:12px}.metric{font-size:1.1rem}form{grid-template-columns:1fr}.field.full,form .submit{grid-column:auto}.pagehead h1{font-size:1.25rem}}
 </style>
+<link rel="stylesheet" href="subscription.css"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml"><meta name="description" content="BizLedger helps small businesses track sales, expenses, inventory and subscriptions.">
 </head>
 <body>
-<header><div class="brand">▦ BizLedger <small>Business records, made clear</small></div><div class="actions"><button class="secondary" id="exportAll">Export backup</button><button class="secondary" id="importBtn">Import backup</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></header>
+<header><div class="brand">▦ BizLedger <small>Business records, made clear</small></div><div class="actions"><div class="shopbar"><label for="shopSelect" style="color:#e3eee8">Shop</label><select id="shopSelect" aria-label="Active shop"></select><button id="installBtn" class="secondary" hidden>Install app</button><button class="secondary" id="exportAll">Export backup</button><button class="secondary" id="importBtn">Import backup</button></div><input id="importFile" type="file" accept=".json,application/json" hidden></div></header>
+<div class="banner"><div id="planBanner" class="upgrade-banner"><p id="planBannerText"></p><button id="planBannerBtn">View plans</button></div><div class="ad-slot" id="freeAd"><span>AdSense link coming soon</span><span>Free plan</span></div></div>
 <main>
-<div class="nav" role="tablist"><button class="active" data-page="dashboard">Dashboard</button><button data-page="sales">Sales</button><button data-page="expenses">Expenses</button><button data-page="debts">Debts</button><button data-page="inventory">Inventory</button><button data-page="reports">Reports</button></div>
+<div class="nav" role="tablist"><button class="active" data-page="dashboard">Dashboard</button><button data-page="sales">Sales</button><button data-page="expenses">Expenses</button><button data-page="debts">Debts</button><button data-page="inventory">Inventory</button><button data-page="reports">Reports</button><button data-page="team">Team</button><button data-page="analytics">Analytics</button><button data-page="subscription">Plan & billing</button></div>
 <section id="dashboard" class="page active">
 <div class="pagehead"><div><h1>Business overview</h1><div class="sub" id="today"></div></div><button id="quickSale">＋ Record sale</button></div>
 <div class="cards">
@@ -85,4 +87,5 @@ function exportJSON(){download(JSON.stringify({app:'BizLedger',version:1,exporte
 document.querySelectorAll('[data-csv]').forEach(b=>b.onclick=()=>exportCSV(b.dataset.csv));$('exportAll').onclick=$('exportAll2').onclick=exportJSON;$('importBtn').onclick=()=>$('importFile').click();$('importFile').onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let d=JSON.parse(await f.text());if(!d||!Array.isArray(d.sales)||!Array.isArray(d.expenses)||!Array.isArray(d.debts)||!Array.isArray(d.inventory))throw Error('This does not look like a BizLedger backup.');if(!confirm('Importing replaces the records currently stored in this browser. Export a backup first. Continue?'))return;db={sales:d.sales,expenses:d.expenses,debts:d.debts,inventory:d.inventory};save();alert('Backup imported.')}catch(err){alert('Import failed: '+err.message)}e.target.value=''};
 render();
 </script>
+<script src="subscription.js"></script>
 </body></html>

@@ -1,0 +1,120 @@
+name: Deploy BizLedger to Netlify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'icon.svg'
+      - 'manifest.webmanifest'
+      - 'service-worker.js'
+      - 'subscription.css'
+      - 'subscription.js'
+      - '.github/workflows/deploy-netlify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Test and deploy BizLedger
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out BizLedger
+        uses: actions/checkout@v4
+
+      - name: Verify the PWA files and demo-only billing/auth
+        run: |
+          node --check subscription.js
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          html = Path('index.html').read_text()
+          manifest = json.loads(Path('manifest.webmanifest').read_text())
+          for asset in ('icon.svg', 'manifest.webmanifest', 'service-worker.js', 'subscription.css', 'subscription.js'):
+              assert Path(asset).is_file(), f'missing {asset}'
+          assert 'AdSense link coming soon' in html, 'Free-plan notice missing'
+          assert manifest.get('name', '').startswith('BizLedger'), 'unexpected PWA manifest name'
+          js = Path('subscription.js').read_text()
+          assert 'Billing integration not configured' in js, 'demo billing notice missing'
+          assert 'Employee authentication is not configured' in js, 'demo auth notice missing'
+          print('PWA assets, Free-plan AdSense notice, demo billing/auth checks passed')
+          PY
+          mkdir -p dist
+          cp index.html icon.svg manifest.webmanifest service-worker.js subscription.css subscription.js dist/
+
+      - name: Find or create the dedicated BizLedger site
+        id: netlify-site
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json, os, sys, urllib.error, urllib.parse, urllib.request
+          token = os.environ.get('NETLIFY_AUTH_TOKEN')
+          if not token:
+              sys.exit('NETLIFY_AUTH_TOKEN is not configured for this repository')
+          base = 'https://api.netlify.com/api/v1'
+          headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
+          def request(method, url, body=None):
+              data = json.dumps(body).encode() if body is not None else None
+              req = urllib.request.Request(url, data=data, method=method, headers={**headers, **({'Content-Type':'application/json'} if data else {})})
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as e:
+                  if e.code in (401, 403):
+                      sys.exit(f'Netlify API denied site access (HTTP {e.code}); check token validity and site-management scope')
+                  sys.exit(f'Netlify API {method} failed with HTTP {e.code}; site lookup/creation could not be completed')
+          sites = []
+          for page in range(1, 11):
+              batch = request('GET', f'{base}/sites?page={page}&per_page=100')
+              if not isinstance(batch, list):
+                  sys.exit('Unexpected Netlify site-list response; refusing to deploy')
+              sites.extend(batch)
+              if len(batch) < 100:
+                  break
+          matches = [s for s in sites if str(s.get('name', '')).casefold() == 'bizledger']
+          if len(matches) > 1:
+              sys.exit('More than one exact BizLedger site was returned; refusing ambiguous deployment')
+          if matches:
+              site = matches[0]
+              repo = (site.get('build_settings') or {}).get('repo_url') or site.get('repo_url')
+              if repo and repo.rstrip('/').casefold() not in ('https://github.com/lonewolf1462/bizledger', 'https://github.com/lonewolf1462/bizledger.git'):
+                  sys.exit('The exact-name Netlify site is linked to a different repository; refusing to alter it')
+              print('Using the existing exact-name BizLedger site')
+          else:
+              site = request('POST', f'{base}/sites', {'name': 'bizledger'})
+              if str(site.get('name', '')).casefold() != 'bizledger' or not site.get('id'):
+                  sys.exit('Netlify did not create the requested BizLedger site; refusing to deploy')
+              print('Created a distinct Netlify site named BizLedger')
+          if not site.get('id') or not site.get('url'):
+              sys.exit('Netlify site response lacked a site ID or URL; refusing to deploy')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"site_id={site['id']}\n")
+              f.write(f"site_url={site['url']}\n")
+          print(f"Verified Netlify site name: {site['name']}")
+          print(f"Netlify site URL: {site['url']}")
+          PY
+
+      - name: Publish the static BizLedger app
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        run: npx --yes netlify-cli deploy --prod --dir=dist --site "${{ steps.netlify-site.outputs.site_id }}" --message "BizLedger GitHub Actions ${GITHUB_SHA}"
+
+      - name: Confirm the deployed site responds
+        env:
+          SITE_URL: ${{ steps.netlify-site.outputs.site_url }}
+        run: |
+          python - <<'PY'
+          import os, sys, urllib.error, urllib.request
+          url = os.environ['SITE_URL']
+          try:
+              with urllib.request.urlopen(url, timeout=30) as response:
+                  body = response.read().decode('utf-8', errors='replace')
+                  if response.status != 200 or 'AdSense link coming soon' not in body:
+                      sys.exit('Deployed site did not return the expected BizLedger page and Free-plan notice')
+                  print(f'HTTP {response.status}: BizLedger page and Free-plan notice verified at {url}')
+          except (urllib.error.URLError, TimeoutError) as e:
+              sys.exit(f'Netlify publish ran, but live URL verification failed: {type(e).__name__}')
+          PY
