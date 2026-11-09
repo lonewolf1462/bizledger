@@ -63,8 +63,15 @@ jobs:
                   with urllib.request.urlopen(req, timeout=30) as response:
                       return json.load(response)
               except urllib.error.HTTPError as e:
+                  detail = e.read().decode('utf-8', errors='replace')
                   if e.code in (401, 403):
                       sys.exit(f'Netlify API denied site access (HTTP {e.code}); check token validity and site-management scope')
+                  if e.code == 422:
+                      try:
+                          detail = json.loads(detail).get('message', 'Netlify rejected the requested site name or account operation')
+                      except Exception:
+                          detail = 'Netlify rejected the requested site name or account operation'
+                      sys.exit(f'Netlify refused BizLedger site creation (HTTP 422): {detail}')
                   sys.exit(f'Netlify API {method} failed with HTTP {e.code}; site lookup/creation could not be completed')
           sites = []
           for page in range(1, 11):
