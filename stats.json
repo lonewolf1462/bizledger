@@ -1,0 +1,7 @@
+{
+  "status": "not_connected",
+  "note": "No download analytics source is connected. No install or download counts have been collected, so none are shown.",
+  "source": null,
+  "updatedAt": null,
+  "metrics": []
+}

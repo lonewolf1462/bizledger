@@ -1,0 +1,10 @@
+{
+  "_comment": "EXAMPLE SHAPE ONLY (values are zero placeholders). Copy to stats.json and replace with real exported numbers when a real source exists. status must be 'connected' and source + updatedAt are required, otherwise the site refuses to show numbers.",
+  "status": "connected",
+  "source": "Name of the real analytics/export source",
+  "updatedAt": "2026-01-01T00:00:00Z",
+  "metrics": [
+    { "label": "Web app installs", "value": 0, "period": "all time" },
+    { "label": "Android APK downloads", "value": 0, "period": "last 30 days" }
+  ]
+}

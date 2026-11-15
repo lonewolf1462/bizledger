@@ -1,0 +1,11 @@
+const assert=require("assert");const {validate,render}=require("../stats.js");const fs=require("fs");
+const real=JSON.parse(fs.readFileSync(__dirname+"/../stats.json","utf8"));
+assert(!validate(real).ok);assert(/not connected/i.test(render(real)));assert(!/\d{2,}/.test(render(real).replace(/<[^>]*>/g,"")));
+assert(!validate(null).ok);
+assert(!validate({status:"connected",metrics:[{label:"a",value:5}]}).ok,"no source");
+assert(!validate({status:"connected",source:"x",updatedAt:"2026-01-01T00:00:00Z",metrics:[{label:"a",value:-1}]}).ok);
+assert(!validate({status:"connected",source:"x",updatedAt:"2026-01-01T00:00:00Z",metrics:[{label:"a",value:"7"}]}).ok);
+const ok={status:"connected",source:"Test export",updatedAt:"2026-01-01T00:00:00Z",metrics:[{label:"<b>x</b>",value:1234}]};
+assert(validate(ok).ok);const h=render(ok);assert(h.includes("1,234")&&h.includes("Test export")&&!h.includes("<b>x"));
+const ex=JSON.parse(fs.readFileSync(__dirname+"/../stats.example.json","utf8"));assert(validate(ex).ok);
+console.log("stats tests passed");
